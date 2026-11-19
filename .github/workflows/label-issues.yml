@@ -15,14 +15,40 @@ jobs:
           script: |
             const issue = context.payload.issue;
             const text = ((issue.title || '') + '\n' + (issue.body || '')).toLowerCase();
-            const labels = [];
-            if (text.includes('error')) labels.push('bug');
-            if (text.includes('add')) labels.push('feature');
-            if (labels.length > 0) {
+            const desiredLabels = ['bug', 'feature'];
+
+            let existingLabels = [];
+            try {
+              const res = await github.rest.issues.listLabelsForRepo({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                per_page: 100
+              });
+              existingLabels = res.data.map(item => item.name);
+            } catch (error) {
+              // If listing labels fails, continue and attempt to create the labels.
+            }
+
+            for (const labelName of desiredLabels) {
+              if (!existingLabels.includes(labelName)) {
+                await github.rest.issues.createLabel({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  name: labelName,
+                  color: labelName === 'bug' ? 'd73a4a' : '0e8a16'
+                });
+              }
+            }
+
+            const matchedLabels = [];
+            if (text.includes('error')) matchedLabels.push('bug');
+            if (text.includes('add')) matchedLabels.push('feature');
+
+            if (matchedLabels.length > 0) {
               await github.rest.issues.addLabels({
                 owner: context.repo.owner,
                 repo: context.repo.repo,
                 issue_number: context.issue.number,
-                labels: labels
+                labels: matchedLabels
               });
             }
